@@ -1,7 +1,7 @@
 
 from django.contrib import admin
 from django.urls import path
-from eDiary.views import *
+from eDMs.views import *
 from django.conf.urls.static import static
 from django.conf import settings
 
