@@ -1,3 +1,4 @@
+from sqlite3 import IntegrityError
 from django.db.models import Q
 from django.shortcuts import render,redirect
 from django.contrib.auth import authenticate, logout, login
@@ -11,49 +12,49 @@ def index(request):
 def registration(request):
     error = ""
     if request.method == "POST":
-        firstName = request.POST['firstName']
-        lastName = request.POST['lastName']
-        emailid = request.POST['emailid']
-        Password = request.POST['Password']
-        mobileNumber = request.POST['mobileNumber']
+        firstName = request.POST.get('firstName')
+        lastName = request.POST.get('lastName')
+        emailid = request.POST.get('emailid')
+        password = request.POST.get('Password')
+        mobileNumber = request.POST.get('mobileNumber')
 
         try:
-            user = User.objects.create_user(username=emailid, password=Password, first_name=firstName, last_name=lastName)
-            Signup.objects.create(user=user, mobileNumber=mobileNumber)
+            # Create user
+            user = User.objects.create_user(username=emailid, password=password, first_name=firstName, last_name=lastName)
+            # Create associated Signup object
+            signup = Signup.objects.create(user=user, mobileNumber=mobileNumber)
             error = "no"
-        except:
+        except IntegrityError:
             error = "yes"
-    return render(request, 'registration.html', locals())
+    return render(request, 'registration.html', {'error': error})
 
 def user_login(request):
     error = ""
     if request.method == 'POST':
-        e = request.POST['emailid']
-        p = request.POST['password']
-        user = authenticate(username=e, password=p)
-        try:
-            if user:
-                login(request, user)
-                error = "no"
-            else:
-                error = "yes"
-        except:
+        email = request.POST.get('emailid')
+        password = request.POST.get('password')
+        user = authenticate(username=email, password=password)
+        if user:
+            login(request, user)
+            return redirect('user_home')
+        else:
             error = "yes"
-    return render(request, 'user_login.html', locals())
+    return render(request, 'user_login.html', {'error': error})
 
 def user_home(request):
     if not request.user.is_authenticated:
         return redirect('user_login')
-    user = User.objects.get(id=request.user.id)
-    signup = Signup.objects.get(user=user)
 
-    totalcategory = Category.objects.filter(signup=signup).count()
-    totalnotes = Notes.objects.filter(signup=signup).count()
+    try:
+        signup = Signup.objects.get(user=request.user)
+        totalcategory = Category.objects.filter(signup=signup).count()
+        totalnotes = Notes.objects.filter(signup=signup).count()
+        categories = Category.objects.filter(signup=signup)
+        notes = Notes.objects.filter(category__in=categories)
+    except Signup.DoesNotExist:
+        return redirect('registration')  # Redirect to registration if signup info doesn't exist
 
-    category = Category.objects.filter(signup=signup)
-    notes = Notes.objects.filter(Q(category__in=category))
-
-    return render(request, 'user_home.html', locals())
+    return render(request, 'user_home.html', {'totalcategory': totalcategory, 'totalnotes': totalnotes, 'notes': notes})
 
 def manageCategory(request):
     if not request.user.is_authenticated:
